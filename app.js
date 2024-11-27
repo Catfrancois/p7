@@ -21,9 +21,7 @@ app.use((req, res, next) => {
 });
 
 app.use(bodyParser.json());
-// middleware
-//check endpoint coté front
-//utilisation du model
+
 app.post('/api/stuff', (req, res) => {
     const thing = new Thing({
         ...req.body
