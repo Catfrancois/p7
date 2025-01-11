@@ -18,8 +18,9 @@ const bookSchema = mongoose.Schema({
 
 bookSchema.pre('save', function (next) {
    if (this.isModified('ratings') && this.ratings.length > 0) {
-      this.averageRating = this.ratings.reduce((acc, rating) => acc + rating.grade, 0) / this.ratings.length;
-   }
+      this.averageRating = (
+          this.ratings.reduce((acc, rating) => acc + rating.grade, 0) / this.ratings.length
+      ).toFixed(1);   }
    next();
 });
 

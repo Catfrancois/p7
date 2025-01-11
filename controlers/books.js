@@ -17,31 +17,39 @@ exports.addBook = (req, res) => {
 };
 
 exports.updateBook = (req, res) => {
+    const bookId = req.params.id;
     const bookObject = req.file ? {
     ...JSON.parse(req.body.book),
-        imageUrl: `${req.protocol}://${req.get('host')}/images/${req.file.filename}`
-    } : { ...req.body };
-
-    delete bookObject._userId;
-    Book.findOne({_id: req.params.id})
-    .then((book) => {
-        if (book.userId !== req.auth.userId) {
-            res.status(401).json({ message: 'Non-autorisé'})
-        } else {
-            Book.updateOne({ _id: req.params.id}, { ...bookObject, _id: req.params.id})
-                .then(() => res.status(200).json({message: 'Livre modifié'}))
-                .catch(error => res.status(401).json({ error }));
+        imageUrl: `${req.protocol}://${req.get('host')}/images/${req.file.filename}`,
         }
-    })
-    .catch((error) => { res.status(400).json({ error })})
+        : { ...req.body };
+
+    delete bookObject.userId;
+    Book.findOne({ _id: bookId })
+        .then((book) => {
+            if (book.userId.toString() !== req.auth.userId.toString()) {
+                return res.status(401).json({ message: 'Non-autorisé' });
+            }
+
+            Book.updateOne({ _id: bookId }, { ...bookObject, _id: bookId })
+                .then(() => {
+                    Book.findOne({ _id: bookId })
+                        .then((updatedBook) => res.status(200).json(updatedBook))
+                        .catch((error) => res.status(400).json({ error }));
+                })
+                .catch((error) => res.status(400).json({ error }));
+        })
+        .catch((error) => {
+            res.status(400).json({ error });
+        });
 };
 
 exports.deleteBook = (req, res) => {
     Book.findOne({ _id: req.params.id})
         .then(book => {
-           if (book.userId !== req.auth.userId) {
-               res.status(401).json({message: 'Non-autorisé'})
-           } else {
+            if (book.userId.toString() !== req.auth.userId.toString()) {
+                return res.status(401).json({ message: 'Non-autorisé' });
+            } else {
                const filename = book.imageUrl.split('/images/')[1];
                fs.unlink(`images/${filename}`, () => {
                    Book.deleteOne({_id: req.params.id})
@@ -88,9 +96,9 @@ exports.rateOneBook = (req, res) => {
 exports.getBestRatedBook = (req, res) => {
     Book.find()
         .then(books => {
-            const bestRatedBook = books.reduce((best, current) =>
-                current.averageRating > (best.averageRating || 0) ? current : best, {});
-            res.status(200).json(bestRatedBook);
+            const sortedBooks = books.sort((a, b) => b.averageRating - a.averageRating);
+            const topBooks = sortedBooks.slice(0, 3);
+            res.status(200).json(topBooks);
         })
         .catch(error => res.status(500).json({ error }));
 };
