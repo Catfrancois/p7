@@ -2,29 +2,72 @@ const Book = require('../models/Book');
 const fs = require('fs');
 
 exports.addBook = (req, res) => {
-    const bookObject = JSON.parse(req.body.book);
+    let bookObject;
+
+    try {
+        bookObject = JSON.parse(req.body.book);
+    } catch (error) {
+        if (req.file) {
+            fs.unlink(`images/${req.file.filename}`, (err) => {
+                if (err) console.error('Error deleting the image:', err);
+            });
+        }
+        return res.status(400).json({ error: 'Invalid book data' });
+    }
+
+    const { title, author, year, genre } = bookObject;
+    if (!title || !author || !year || !genre) {
+        if (req.file) {
+            fs.unlink(`images/${req.file.filename}`, (err) => {
+                if (err) console.error('Error deleting the image:', err);
+            });
+        }
+        return res.status(400).json({ error: 'All fields are required' });
+    }
+
     delete bookObject._id;
     delete bookObject._userId;
+
     const book = new Book({
         ...bookObject,
         userId: req.auth.userId,
-        imageUrl: `${req.protocol}://${req.get('host')}/images/${req.file.filename}`
+        imageUrl: `${req.protocol}://${req.get('host')}/images/${req.file.filename}`,
     });
 
     book.save()
-        .then(() => { res.status(201).json({ message: 'Livre enregistré !'})})
-        .catch(error => res.status(400).json({ error }));
+        .then(() => res.status(201).json({ message: 'Livre enregistré !' }))
+        .catch((error) => {
+            if (req.file) {
+                fs.unlink(`images/${req.file.filename}`, (err) => {
+                    if (err) console.error('Error deleting the image:', err);
+                });
+            }
+            res.status(400).json({ error });
+        });
 };
 
 exports.updateBook = (req, res) => {
     const bookId = req.params.id;
-    const bookObject = req.file ? {
-    ...JSON.parse(req.body.book),
-        imageUrl: `${req.protocol}://${req.get('host')}/images/${req.file.filename}`,
+
+    const bookObject = req.file
+        ? {
+            ...JSON.parse(req.body.book),
+            imageUrl: `${req.protocol}://${req.get('host')}/images/${req.file.filename}`,
         }
         : { ...req.body };
 
+    const { title, author, year, genre } = bookObject;
+    if (!title || !author || !year || !genre) {
+        if (req.file) {
+            fs.unlink(`images/${req.file.filename}`, (err) => {
+                if (err) console.error('Error deleting the image:', err);
+            });
+        }
+        return res.status(400).json({ error: 'All fields are required for updating the book' });
+    }
+
     delete bookObject.userId;
+
     Book.findOne({ _id: bookId })
         .then((book) => {
             if (book.userId.toString() !== req.auth.userId.toString()) {
@@ -37,7 +80,14 @@ exports.updateBook = (req, res) => {
                         .then((updatedBook) => res.status(200).json(updatedBook))
                         .catch((error) => res.status(400).json({ error }));
                 })
-                .catch((error) => res.status(400).json({ error }));
+                .catch((error) => {
+                    if (req.file) {
+                        fs.unlink(`images/${req.file.filename}`, (err) => {
+                            if (err) console.error('Error deleting the image:', err);
+                        });
+                    }
+                    res.status(400).json({ error });
+                });
         })
         .catch((error) => {
             res.status(400).json({ error });
@@ -71,8 +121,10 @@ exports.getOneBook = (req, res) => {
 
 exports.getAllBook = (req, res) => {
     Book.find()
-    .then(books => res.status(200).json(books))
-    .catch(error => res.status(400).json({ error }));
+        .then(books => {
+            res.status(200).json(books);
+        })
+        .catch(error => res.status(400).json({ error }));
 };
 
 exports.rateOneBook = (req, res) => {

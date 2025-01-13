@@ -2,6 +2,8 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
 
 const routeBooks = require('./routes/books');
 const routeUser = require('./routes/user');
@@ -12,6 +14,16 @@ mongoose.connect('mongodb+srv://catinotfrancois:jY6Swx8iEyR98vVC@cluster0.na8im.
         useUnifiedTopology: true })
     .then(() => console.log('Connexion à MongoDB réussie !'))
     .catch(() => console.log('Connexion à MongoDB échouée !'));
+
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+});
+
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin"}
+}));
+app.use(limiter);
 
 app.use(express.json());
 
